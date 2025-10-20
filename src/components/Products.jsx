@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Edit2, Trash2, X, Check } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Check, Eye, EyeOff } from 'lucide-react';
 
 const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -8,6 +8,7 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editMode, setEditMode] = useState({});
+  const [showCostPrice, setShowCostPrice] = useState(true);
 
   const initialProductForm = {
     name: '',
@@ -130,17 +131,29 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
         <h2 className="text-2xl font-bold text-gray-800" style={{ fontFamily: 'Playfair Display, serif' }}>
           Gestión de Productos
         </h2>
-        <button
-          onClick={() => {
-            setEditingProduct(null);
-            setProductForm(initialProductForm);
-            setShowAddModal(true);
-          }}
-          className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl hover:bg-primary/90 transition-colors shadow-lg"
-        >
-          <Plus className="w-5 h-5" />
-          Agregar Producto
-        </button>
+        <div className="flex gap-3">
+          {user.role === 'admin' && (
+            <button
+              onClick={() => setShowCostPrice(!showCostPrice)}
+              className="flex items-center gap-2 bg-gray-600 text-white px-4 py-3 rounded-xl hover:bg-gray-700 transition-colors"
+              title={showCostPrice ? "Ocultar Precio Costo" : "Mostrar Precio Costo"}
+            >
+              {showCostPrice ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              {showCostPrice ? "Ocultar Costo" : "Mostrar Costo"}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setEditingProduct(null);
+              setProductForm(initialProductForm);
+              setShowAddModal(true);
+            }}
+            className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl hover:bg-primary/90 transition-colors shadow-lg"
+          >
+            <Plus className="w-5 h-5" />
+            Agregar Producto
+          </button>
+        </div>
       </div>
       
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -188,7 +201,7 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalle</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Talles y Cantidades</th>
-                  {user.role === 'admin' && (
+                  {user.role === 'admin' && showCostPrice && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Costo</th>
                   )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Contado</th>
@@ -203,15 +216,45 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
                       <img src={product.image} alt={product.name} className="w-16 h-16 object-cover rounded-lg" />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-gray-900">{product.name}</span>
+                      {editMode[product.id] ? (
+                        <input
+                          type="text"
+                          value={product.name}
+                          onChange={(e) => updateProductField(product.id, 'name', e.target.value)}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                        />
+                      ) : (
+                        <span className="text-sm font-medium text-gray-900">{product.name}</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-3 py-1 text-xs font-medium rounded-full bg-secondary text-primary">
-                        {product.category}
-                      </span>
+                      {editMode[product.id] ? (
+                        <select
+                          value={product.category}
+                          onChange={(e) => updateProductField(product.id, 'category', e.target.value)}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded"
+                        >
+                          {categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="px-3 py-1 text-xs font-medium rounded-full bg-secondary text-primary">
+                          {product.category}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">{product.detail}</span>
+                      {editMode[product.id] ? (
+                        <input
+                          type="text"
+                          value={product.detail}
+                          onChange={(e) => updateProductField(product.id, 'detail', e.target.value)}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                        />
+                      ) : (
+                        <span className="text-sm text-gray-600">{product.detail}</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {editMode[product.id] ? (
@@ -251,7 +294,7 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
                         </div>
                       )}
                     </td>
-                    {user.role === 'admin' && (
+                    {user.role === 'admin' && showCostPrice && (
                       <td className="px-6 py-4 whitespace-nowrap">
                         {editMode[product.id] ? (
                           <input
@@ -277,8 +320,17 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
                         <span className="text-sm font-semibold text-primary">${product.cashPrice}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      ${product.listPrice}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {editMode[product.id] ? (
+                        <input
+                          type="number"
+                          value={product.listPrice}
+                          onChange={(e) => updateProductField(product.id, 'listPrice', e.target.value)}
+                          className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
+                        />
+                      ) : (
+                        <span className="text-sm text-gray-700">${product.listPrice}</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex gap-2">

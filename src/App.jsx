@@ -12,6 +12,8 @@ function App() {
   const [user] = useState({ role: 'admin', name: 'Admin' });
   const [priceMarkup, setPriceMarkup] = useState(30);
   const [categories, setCategories] = useState(['Vestidos', 'Blusas', 'Pantalones', 'Faldas', 'Accesorios']);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  
   const [products, setProducts] = useState([
     {
       id: 1,
@@ -67,10 +69,14 @@ function App() {
   ]);
 
   const [sales, setSales] = useState([
-    { id: 1, customer: 'María González', product: 'Vestido Floral', date: '2025-10-15', amount: 4500, status: 'vendida' },
-    { id: 2, customer: 'Laura Pérez', product: 'Blusa Romántica', date: '2025-10-16', amount: 3200, status: 'reservada' },
-    { id: 3, customer: 'Ana Rodríguez', product: 'Pantalón Palazzo', date: '2025-10-17', amount: 3800, status: 'vendida' }
+    { id: 1, customer: 'María González', product: 'Vestido Floral', size: 'M', quantity: 1, date: '2025-10-15', amount: 4500, status: 'vendida' },
+    { id: 2, customer: 'Laura Pérez', product: 'Blusa Romántica', size: 'S', quantity: 1, date: '2025-10-16', amount: 3200, status: 'reservada' },
+    { id: 3, customer: 'Ana Rodríguez', product: 'Pantalón Palazzo', size: 'L', quantity: 1, date: '2025-10-17', amount: 3800, status: 'vendida' }
   ]);
+
+  const handleAddSale = (sale) => {
+    setSales([...sales, { ...sale, id: Date.now() }]);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -78,9 +84,12 @@ function App() {
         currentView={currentView}
         setCurrentView={setCurrentView}
         user={user}
+        isOpen={isSidebarOpen}
+        setIsOpen={setIsSidebarOpen}
       />
       
-      <div className="ml-64 p-8">
+      {/* Contenido principal que se ajusta dinámicamente */}
+      <div className={`p-8 transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
         {currentView === 'dashboard' && (
           <Dashboard products={products} sales={sales} />
         )}
@@ -100,12 +109,13 @@ function App() {
           />
         )}
         {currentView === 'sales' && (
-          <Sales sales={sales} />
+          <Sales sales={sales} setSales={setSales} />
         )}
         {currentView === 'catalog' && (
           <Catalog 
             products={products}
             categories={categories}
+            onAddSale={handleAddSale}
           />
         )}
         {currentView === 'settings' && (
