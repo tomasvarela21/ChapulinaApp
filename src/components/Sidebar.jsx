@@ -1,7 +1,9 @@
 import React from 'react';
 import { BarChart3, Package, ShoppingBag, Users, Tag, Settings, LogOut, Menu, X } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen }) => {
+  const { logout } = useAuth();
   return (
     <>
       {/* Toggle Button */}
@@ -96,7 +98,11 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen }) => {
               <p className="font-medium text-gray-700">{user.name}</p>
               <p className="text-xs text-gray-500 capitalize">{user.role}</p>
             </div>
-            <button className="text-gray-400 hover:text-gray-600">
+            <button
+              onClick={logout}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+              title="Cerrar sesión"
+            >
               <LogOut className="w-5 h-5" />
             </button>
           </div>
