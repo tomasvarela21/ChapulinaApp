@@ -10,6 +10,7 @@ import productRoutes from './routes/productRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import saleRoutes from './routes/saleRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
+import userRoutes from './routes/users.js';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -42,6 +43,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/users', userRoutes);
 
 // Middleware de manejo de errores (debe ir al final)
 app.use(errorHandler);

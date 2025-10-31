@@ -5,7 +5,8 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
-  getLowStockProducts
+  getLowStockProducts,
+  updateAllListPrices
 } from '../controllers/productController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -15,6 +16,8 @@ const router = express.Router();
 router.use(protect);
 
 router.get('/low-stock', getLowStockProducts);
+router.put('/update-list-prices', authorize('admin'), updateAllListPrices);
+
 router.route('/')
   .get(getProducts)
   .post(authorize('admin'), createProduct);

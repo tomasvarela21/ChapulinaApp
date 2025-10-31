@@ -65,7 +65,7 @@ const products = [
     costPrice: 1800,
     cashPrice: 3200,
     listPrice: 4160,
-    image: 'https://images.unsplash.com/photo-1564257577-620ffc3b38d8?w=100&h=100&fit=crop'
+    image:'https://hips.hearstapps.com/hmg-prod/images/blusa-zara-camisa-romantica-tendencia-cuello-bobo-harpers-bazaar-1602587397.jpg?crop=1.00xw:0.668xh;0,0.217xh&resize=640:*' 
   },
   {
     name: 'Pantalón Palazzo',

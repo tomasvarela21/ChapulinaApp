@@ -72,7 +72,7 @@ export const getSale = async (req, res) => {
 // @access  Private
 export const createSale = async (req, res) => {
   try {
-    const { product: productId, size, quantity } = req.body;
+    const { product: productId, size, quantity, status } = req.body;
 
     // Verificar que el producto existe
     const product = await Product.findById(productId);
@@ -97,10 +97,11 @@ export const createSale = async (req, res) => {
     const sale = await Sale.create({
       ...req.body,
       productName: product.name,
+      category: product.category,
       soldBy: req.user._id
     });
 
-    // Actualizar stock del producto
+    // Descontar stock para ventas y reservas (ambos descuentan temporalmente)
     const sizeIndex = product.sizes.findIndex(s => s.size === size);
     product.sizes[sizeIndex].quantity -= quantity;
     await product.save();
@@ -131,16 +132,24 @@ export const updateSale = async (req, res) => {
       });
     }
 
-    // Si se cancela una venta, restaurar el stock
+    const product = await Product.findById(sale.product);
+
+    // Si se cancela una reserva o venta, restaurar el stock
     if (req.body.status === 'cancelada' && sale.status !== 'cancelada') {
-      const product = await Product.findById(sale.product);
       if (product) {
         const sizeIndex = product.sizes.findIndex(s => s.size === sale.size);
         if (sizeIndex !== -1) {
+          // Devolver el stock al cancelar (tanto ventas como reservas)
           product.sizes[sizeIndex].quantity += sale.quantity;
           await product.save();
         }
       }
+    }
+
+    // Si se cambia de reservada a retirada, el stock ya fue descontado
+    // Solo necesitamos actualizar el estado
+    if (req.body.status === 'retirada' && sale.status === 'reservada') {
+      // El stock ya fue descontado al crear la reserva, solo cambiamos el estado
     }
 
     sale = await Sale.findByIdAndUpdate(

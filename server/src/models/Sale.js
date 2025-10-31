@@ -3,8 +3,15 @@ import mongoose from 'mongoose';
 const saleSchema = new mongoose.Schema({
   customer: {
     type: String,
-    required: [true, 'El nombre del cliente es requerido'],
-    trim: true
+    required: false,
+    trim: true,
+    default: ''
+  },
+  phone: {
+    type: String,
+    required: false,
+    trim: true,
+    default: ''
   },
   product: {
     type: mongoose.Schema.Types.ObjectId,
@@ -14,6 +21,10 @@ const saleSchema = new mongoose.Schema({
   productName: {
     type: String,
     required: true
+  },
+  category: {
+    type: String,
+    required: false
   },
   size: {
     type: String,
@@ -25,6 +36,11 @@ const saleSchema = new mongoose.Schema({
     min: 1,
     default: 1
   },
+  priceType: {
+    type: String,
+    enum: ['contado', 'lista'],
+    default: 'contado'
+  },
   amount: {
     type: Number,
     required: [true, 'El monto es requerido'],
@@ -32,13 +48,13 @@ const saleSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['vendida', 'reservada', 'cancelada'],
+    enum: ['vendida', 'reservada', 'retirada', 'cancelada'],
     default: 'vendida'
   },
   paymentMethod: {
     type: String,
-    enum: ['efectivo', 'tarjeta', 'transferencia'],
-    default: 'efectivo'
+    enum: ['efectivo', 'tarjeta', 'transferencia', 'none'],
+    default: 'none'
   },
   notes: {
     type: String,

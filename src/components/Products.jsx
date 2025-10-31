@@ -1,14 +1,37 @@
-import React, { useState } from 'react';
-import { Plus, Search, Edit2, Trash2, X, Check, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Edit2, Trash2, X, Check, Eye, EyeOff, Loader2 } from 'lucide-react';
+import productService from '../services/productService';
+import categoryService from '../services/categoryService';
+import settingsService from '../services/settingsService';
+import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
+import ConfirmDialog from './ConfirmDialog';
 
-const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
+const Products = () => {
+  const { user } = useAuth();
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [priceMarkup, setPriceMarkup] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editMode, setEditMode] = useState({});
-  const [showCostPrice, setShowCostPrice] = useState(true);
+  // Recuperar estado de localStorage o usar true por defecto
+  const [showCostPrice, setShowCostPrice] = useState(() => {
+    const saved = localStorage.getItem('showCostPrice');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    type: 'danger'
+  });
 
   const initialProductForm = {
     name: '',
@@ -22,52 +45,111 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
 
   const [productForm, setProductForm] = useState(initialProductForm);
 
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Guardar en localStorage cuando cambie el estado de showCostPrice
+  const toggleShowCostPrice = () => {
+    setShowCostPrice(prev => {
+      const newValue = !prev;
+      localStorage.setItem('showCostPrice', JSON.stringify(newValue));
+      return newValue;
+    });
+  };
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [productsResponse, categoriesResponse, settingsResponse] = await Promise.all([
+        productService.getAll(),
+        categoryService.getAll(),
+        settingsService.get().catch(() => ({ data: { priceMarkup: 0 } }))
+      ]);
+      setProducts(productsResponse.data || []);
+      setCategories(categoriesResponse.data || []);
+      setPriceMarkup(settingsResponse.data?.priceMarkup || 0);
+    } catch (err) {
+      console.error('Error fetching products data:', err);
+      setError('Error al cargar los datos de productos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const calculateListPrice = (cashPrice) => {
     return Math.round(Number(cashPrice) * (1 + priceMarkup / 100));
   };
 
-  const handleAddProduct = () => {
+  const handleAddProduct = async () => {
     if (!productForm.name || !productForm.category) return;
-    
-    const totalQuantity = productForm.sizes.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
-    
-    const newProduct = {
-      id: Date.now(),
-      ...productForm,
-      quantity: totalQuantity,
-      listPrice: calculateListPrice(productForm.cashPrice),
-      image: productForm.image || 'https://via.placeholder.com/100'
-    };
-    
-    setProducts([...products, newProduct]);
-    setProductForm(initialProductForm);
-    setShowAddModal(false);
+
+    try {
+      const totalQuantity = productForm.sizes.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
+
+      const newProduct = {
+        ...productForm,
+        quantity: totalQuantity,
+        listPrice: calculateListPrice(productForm.cashPrice),
+        image: productForm.image || 'https://via.placeholder.com/100'
+      };
+
+      const response = await productService.create(newProduct);
+      setProducts([...products, response.data]);
+      setProductForm(initialProductForm);
+      setShowAddModal(false);
+      toast.success('Producto agregado exitosamente');
+    } catch (err) {
+      console.error('Error adding product:', err);
+      toast.error('Error al agregar el producto');
+    }
   };
 
-  const handleUpdateProduct = () => {
+  const handleUpdateProduct = async () => {
     if (!productForm.name || !productForm.category) return;
-    
-    const totalQuantity = productForm.sizes.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
-    
-    setProducts(products.map(p => 
-      p.id === editingProduct.id 
-        ? { 
-            ...productForm, 
-            id: editingProduct.id,
-            quantity: totalQuantity,
-            listPrice: calculateListPrice(productForm.cashPrice)
-          }
-        : p
-    ));
-    setProductForm(initialProductForm);
-    setEditingProduct(null);
-    setShowAddModal(false);
+
+    try {
+      const totalQuantity = productForm.sizes.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
+
+      const updatedProduct = {
+        ...productForm,
+        quantity: totalQuantity,
+        listPrice: calculateListPrice(productForm.cashPrice)
+      };
+
+      const response = await productService.update(editingProduct._id, updatedProduct);
+      setProducts(products.map(p =>
+        p._id === editingProduct._id ? response.data : p
+      ));
+      setProductForm(initialProductForm);
+      setEditingProduct(null);
+      setShowAddModal(false);
+      toast.success('Producto actualizado exitosamente');
+    } catch (err) {
+      console.error('Error updating product:', err);
+      toast.error('Error al actualizar el producto');
+    }
   };
 
   const handleDeleteProduct = (id) => {
-    if (window.confirm('¿Estás segura de eliminar este producto?')) {
-      setProducts(products.filter(p => p.id !== id));
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: '¿Eliminar producto?',
+      message: 'Esta acción no se puede deshacer. ¿Estás segura de que deseas eliminar este producto del inventario?',
+      type: 'danger',
+      onConfirm: async () => {
+        const loadingToast = toast.loading('Eliminando producto...');
+        try {
+          await productService.delete(id);
+          setProducts(products.filter(p => p._id !== id));
+          toast.success('Producto eliminado exitosamente', { id: loadingToast });
+        } catch (err) {
+          console.error('Error deleting product:', err);
+          toast.error('Error al eliminar el producto', { id: loadingToast });
+        }
+      }
+    });
   };
 
   const toggleEditMode = (productId) => {
@@ -77,25 +159,36 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
     }));
   };
 
-  const confirmEdit = (productId) => {
-    const product = products.find(p => p.id === productId);
+  const confirmEdit = async (productId) => {
+    const product = products.find(p => p._id === productId);
     if (product) {
-      const totalQuantity = product.sizes.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
-      setProducts(products.map(p => 
-        p.id === productId 
-          ? { ...p, quantity: totalQuantity, listPrice: calculateListPrice(p.cashPrice) }
-          : p
-      ));
-      setEditMode(prev => ({
-        ...prev,
-        [productId]: false
-      }));
+      try {
+        const totalQuantity = product.sizes.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
+        const updatedProduct = {
+          ...product,
+          quantity: totalQuantity,
+          listPrice: calculateListPrice(product.cashPrice)
+        };
+
+        const response = await productService.update(productId, updatedProduct);
+        setProducts(products.map(p =>
+          p._id === productId ? response.data : p
+        ));
+        setEditMode(prev => ({
+          ...prev,
+          [productId]: false
+        }));
+        toast.success('Cambios guardados exitosamente');
+      } catch (err) {
+        console.error('Error confirming edit:', err);
+        toast.error('Error al actualizar el producto');
+      }
     }
   };
 
   const updateProductField = (productId, field, value) => {
-    setProducts(products.map(p => 
-      p.id === productId 
+    setProducts(products.map(p =>
+      p._id === productId
         ? { ...p, [field]: value }
         : p
     ));
@@ -103,7 +196,7 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
 
   const updateProductSize = (productId, sizeIndex, quantity) => {
     setProducts(products.map(p => {
-      if (p.id === productId) {
+      if (p._id === productId) {
         const newSizes = [...p.sizes];
         newSizes[sizeIndex] = { ...newSizes[sizeIndex], quantity: Number(quantity || 0) };
         return { ...p, sizes: newSizes };
@@ -112,8 +205,24 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
     }));
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700">
+        {error}
+      </div>
+    );
+  }
+
   const filteredProducts = products
-    .filter(p => 
+    .filter(p =>
       (categoryFilter === 'all' || p.category === categoryFilter) &&
       (p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
        p.detail.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -126,20 +235,20 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
     });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800" style={{ fontFamily: 'Playfair Display, serif' }}>
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-800" style={{ fontFamily: 'Playfair Display, serif' }}>
           Gestión de Productos
         </h2>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2 md:gap-3">
           {user.role === 'admin' && (
             <button
-              onClick={() => setShowCostPrice(!showCostPrice)}
-              className="flex items-center gap-2 bg-gray-600 text-white px-4 py-3 rounded-xl hover:bg-gray-700 transition-colors"
+              onClick={toggleShowCostPrice}
+              className="flex items-center gap-2 bg-gray-600 text-white px-3 md:px-4 py-2 md:py-3 rounded-xl hover:bg-gray-700 transition-colors text-sm md:text-base"
               title={showCostPrice ? "Ocultar Precio Costo" : "Mostrar Precio Costo"}
             >
-              {showCostPrice ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              {showCostPrice ? "Ocultar Costo" : "Mostrar Costo"}
+              {showCostPrice ? <EyeOff className="w-4 h-4 md:w-5 md:h-5" /> : <Eye className="w-4 h-4 md:w-5 md:h-5" />}
+              <span className="hidden sm:inline">{showCostPrice ? "Ocultar Costo" : "Mostrar Costo"}</span>
             </button>
           )}
           <button
@@ -148,17 +257,17 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
               setProductForm(initialProductForm);
               setShowAddModal(true);
             }}
-            className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl hover:bg-primary/90 transition-colors shadow-lg"
+            className="flex items-center gap-2 bg-primary text-white px-4 md:px-6 py-2 md:py-3 rounded-xl hover:bg-primary/90 transition-colors shadow-lg text-sm md:text-base"
           >
-            <Plus className="w-5 h-5" />
-            Agregar Producto
+            <Plus className="w-4 h-4 md:w-5 md:h-5" />
+            <span className="hidden sm:inline">Agregar</span> Producto
           </button>
         </div>
       </div>
       
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+      <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
         <div className="space-y-4">
-          <div className="flex gap-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-3 md:gap-4 mb-6">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
@@ -173,18 +282,18 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-primary"
+              className="px-3 md:px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-primary text-sm md:text-base"
             >
               <option value="all">Todas las categorías</option>
               {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
+                <option key={cat._id} value={cat.name}>{cat.name}</option>
               ))}
             </select>
-            
+
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-primary"
+              className="px-3 md:px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-primary text-sm md:text-base"
             >
               <option value="name">Ordenar por nombre</option>
               <option value="price">Ordenar por precio</option>
@@ -192,72 +301,72 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
             </select>
           </div>
           
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto -mx-4 md:mx-0">
+            <table className="w-full min-w-[800px]">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Imagen</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalle</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Talles y Cantidades</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Imagen</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Detalle</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Talles</th>
                   {user.role === 'admin' && showCostPrice && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Costo</th>
+                    <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">P. Costo</th>
                   )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Contado</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Lista</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">P. Contado</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">P. Lista</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filteredProducts.map(product => (
-                  <tr key={product.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <img src={product.image} alt={product.name} className="w-16 h-16 object-cover rounded-lg" />
+                  <tr key={product._id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                      <img src={product.image} alt={product.name} className="w-12 h-12 md:w-16 md:h-16 object-cover rounded-lg" />
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {editMode[product.id] ? (
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                      {editMode[product._id] ? (
                         <input
                           type="text"
                           value={product.name}
-                          onChange={(e) => updateProductField(product.id, 'name', e.target.value)}
+                          onChange={(e) => updateProductField(product._id, 'name', e.target.value)}
                           className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                         />
                       ) : (
                         <span className="text-sm font-medium text-gray-900">{product.name}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {editMode[product.id] ? (
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                      {editMode[product._id] ? (
                         <select
                           value={product.category}
-                          onChange={(e) => updateProductField(product.id, 'category', e.target.value)}
+                          onChange={(e) => updateProductField(product._id, 'category', e.target.value)}
                           className="px-2 py-1 text-xs border border-gray-300 rounded"
                         >
                           {categories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
+                            <option key={cat._id} value={cat.name}>{cat.name}</option>
                           ))}
                         </select>
                       ) : (
-                        <span className="px-3 py-1 text-xs font-medium rounded-full bg-secondary text-primary">
+                        <span className="px-2 md:px-3 py-1 text-xs font-medium rounded-full bg-secondary text-primary">
                           {product.category}
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
-                      {editMode[product.id] ? (
+                    <td className="px-3 md:px-6 py-3 md:py-4 hidden lg:table-cell">
+                      {editMode[product._id] ? (
                         <input
                           type="text"
                           value={product.detail}
-                          onChange={(e) => updateProductField(product.id, 'detail', e.target.value)}
+                          onChange={(e) => updateProductField(product._id, 'detail', e.target.value)}
                           className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                         />
                       ) : (
                         <span className="text-sm text-gray-600">{product.detail}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {editMode[product.id] ? (
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                      {editMode[product._id] ? (
                         <div className="space-y-1">
                           {product.sizes.map((sizeObj, idx) => (
                             <div key={idx} className="flex items-center gap-2">
@@ -266,7 +375,7 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
                                 type="number"
                                 min="0"
                                 value={sizeObj.quantity}
-                                onChange={(e) => updateProductSize(product.id, idx, e.target.value)}
+                                onChange={(e) => updateProductSize(product._id, idx, e.target.value)}
                                 className="w-16 px-2 py-1 text-sm border border-gray-300 rounded"
                               />
                             </div>
@@ -295,56 +404,56 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
                       )}
                     </td>
                     {user.role === 'admin' && showCostPrice && (
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {editMode[product.id] ? (
+                      <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                        {editMode[product._id] ? (
                           <input
                             type="number"
                             value={product.costPrice}
-                            onChange={(e) => updateProductField(product.id, 'costPrice', e.target.value)}
-                            className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
+                            onChange={(e) => updateProductField(product._id, 'costPrice', e.target.value)}
+                            className="w-20 md:w-24 px-2 py-1 text-sm border border-gray-300 rounded"
                           />
                         ) : (
                           <span className="text-sm text-gray-700">${product.costPrice}</span>
                         )}
                       </td>
                     )}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {editMode[product.id] ? (
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                      {editMode[product._id] ? (
                         <input
                           type="number"
                           value={product.cashPrice}
-                          onChange={(e) => updateProductField(product.id, 'cashPrice', e.target.value)}
-                          className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
+                          onChange={(e) => updateProductField(product._id, 'cashPrice', e.target.value)}
+                          className="w-20 md:w-24 px-2 py-1 text-sm border border-gray-300 rounded"
                         />
                       ) : (
                         <span className="text-sm font-semibold text-primary">${product.cashPrice}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {editMode[product.id] ? (
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                      {editMode[product._id] ? (
                         <input
                           type="number"
                           value={product.listPrice}
-                          onChange={(e) => updateProductField(product.id, 'listPrice', e.target.value)}
-                          className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
+                          onChange={(e) => updateProductField(product._id, 'listPrice', e.target.value)}
+                          className="w-20 md:w-24 px-2 py-1 text-sm border border-gray-300 rounded"
                         />
                       ) : (
                         <span className="text-sm text-gray-700">${product.listPrice}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm">
                       <div className="flex gap-2">
-                        {editMode[product.id] ? (
+                        {editMode[product._id] ? (
                           <>
                             <button
-                              onClick={() => confirmEdit(product.id)}
+                              onClick={() => confirmEdit(product._id)}
                               className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                               title="Confirmar cambios"
                             >
                               <Check className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => toggleEditMode(product.id)}
+                              onClick={() => toggleEditMode(product._id)}
                               className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                               title="Cancelar"
                             >
@@ -354,14 +463,14 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
                         ) : (
                           <>
                             <button
-                              onClick={() => toggleEditMode(product.id)}
+                              onClick={() => toggleEditMode(product._id)}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                               title="Habilitar edición"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleDeleteProduct(product.id)}
+                              onClick={() => handleDeleteProduct(product._id)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               title="Eliminar"
                             >
@@ -422,7 +531,7 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
                   >
                     <option value="">Seleccionar...</option>
                     {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat._id} value={cat.name}>{cat.name}</option>
                     ))}
                   </select>
                 </div>
@@ -522,6 +631,16 @@ const Products = ({ products, setProducts, categories, user, priceMarkup }) => {
           </div>
         </div>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type={confirmDialog.type}
+      />
     </div>
   );
 };

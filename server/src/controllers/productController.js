@@ -178,3 +178,46 @@ export const getLowStockProducts = async (req, res) => {
     });
   }
 };
+
+// @desc    Actualizar precios lista de todos los productos
+// @route   PUT /api/products/update-list-prices
+// @access  Private/Admin
+export const updateAllListPrices = async (req, res) => {
+  try {
+    const { priceMarkup } = req.body;
+
+    if (typeof priceMarkup !== 'number' || priceMarkup < 0 || priceMarkup > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'El porcentaje de recargo debe ser un número entre 0 y 100'
+      });
+    }
+
+    // Obtener todos los productos
+    const products = await Product.find({});
+
+    // Actualizar cada producto con el nuevo precio lista
+    const updatePromises = products.map(async (product) => {
+      const newListPrice = Math.round(product.cashPrice * (1 + priceMarkup / 100));
+      product.listPrice = newListPrice;
+      return product.save();
+    });
+
+    await Promise.all(updatePromises);
+
+    // Obtener productos actualizados
+    const updatedProducts = await Product.find({});
+
+    res.json({
+      success: true,
+      message: `Se actualizaron los precios lista de ${products.length} productos`,
+      count: updatedProducts.length,
+      data: updatedProducts
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+};

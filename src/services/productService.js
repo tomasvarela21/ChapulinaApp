@@ -42,6 +42,12 @@ const productService = {
   getLowStock: async (threshold = 5) => {
     const response = await api.get(`/products/low-stock?threshold=${threshold}`);
     return response.data;
+  },
+
+  // Update all list prices based on markup
+  updateAllListPrices: async (priceMarkup) => {
+    const response = await api.put('/products/update-list-prices', { priceMarkup });
+    return response.data;
   }
 };
 
