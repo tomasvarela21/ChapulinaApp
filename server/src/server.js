@@ -49,16 +49,21 @@ app.use('/api/users', userRoutes);
 app.use(errorHandler);
 
 // Puerto
+// Puerto
 const PORT = process.env.PORT || 5000;
 
-// Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-});
+// Iniciar servidor solo en desarrollo local
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  });
 
-// Manejar rechazos de promesas no manejadas
-process.on('unhandledRejection', (err, promise) => {
-  console.log(`❌ Error: ${err.message}`);
-  // Cerrar servidor y salir del proceso
-  process.exit(1);
-});
+  // Manejar rechazos de promesas no manejadas
+  process.on('unhandledRejection', (err, promise) => {
+    console.log(`❌ Error: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+// Exportar para que index.js pueda usarlo
+export default app;
