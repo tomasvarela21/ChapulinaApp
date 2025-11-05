@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, Loader2 } from 'lucide-react';
+import { LogIn, Loader2, Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
   const { login, error } = useAuth();
@@ -10,6 +10,7 @@ const Login = () => {
   });
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
@@ -33,24 +34,10 @@ const Login = () => {
     setLoading(false);
 
     if (!result.success) {
-      setLocalError(result.message);
+      setLocalError('Usuario o contraseña incorrectos');
     }
   };
 
-  // Función para llenar credenciales de demo
-  const fillDemoCredentials = (role) => {
-    if (role === 'admin') {
-      setFormData({
-        email: 'admin@chapulina.com',
-        password: 'admin123'
-      });
-    } else {
-      setFormData({
-        email: 'vendedora@chapulina.com',
-        password: 'vendedora123'
-      });
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -87,15 +74,29 @@ const Login = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Contraseña
               </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-primary transition-colors"
-                placeholder="••••••••"
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 focus:outline-none focus:border-primary transition-colors"
+                  placeholder="••••••••"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                  disabled={loading}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Error Message */}
@@ -124,29 +125,6 @@ const Login = () => {
               )}
             </button>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-sm text-gray-600 text-center mb-3">
-              Credenciales de prueba:
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => fillDemoCredentials('admin')}
-                className="flex-1 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                disabled={loading}
-              >
-                Admin
-              </button>
-              <button
-                onClick={() => fillDemoCredentials('vendedor')}
-                className="flex-1 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                disabled={loading}
-              >
-                Vendedor
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
