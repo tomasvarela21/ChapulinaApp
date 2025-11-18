@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Trash2, X, Check, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Eye, EyeOff, Loader2 } from 'lucide-react';
 import productService from '../services/productService';
 import categoryService from '../services/categoryService';
 import settingsService from '../services/settingsService';
@@ -19,7 +19,6 @@ const Products = () => {
   const [sortBy, setSortBy] = useState('name');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [editMode, setEditMode] = useState({});
   // Recuperar estado de localStorage o usar true por defecto
   const [showCostPrice, setShowCostPrice] = useState(() => {
     const saved = localStorage.getItem('showCostPrice');
@@ -44,6 +43,7 @@ const Products = () => {
   };
 
   const [productForm, setProductForm] = useState(initialProductForm);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -132,6 +132,46 @@ const Products = () => {
     }
   };
 
+  const handleProductImageUpload = async (event) => {
+    const input = event.target;
+    const file = input?.files?.[0];
+    if (!file) return;
+
+    const isValidType = file.type === 'image/png' ||
+      file.type === 'image/jpeg' ||
+      file.type === 'image/jpg' ||
+      file.type === 'image/webp';
+
+    if (!isValidType) {
+      toast.error('Solo se permiten imágenes PNG o JPG');
+      if (input) input.value = '';
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    setUploadingImage(true);
+    try {
+      const response = await productService.uploadImage(formData);
+      const uploadedUrl = response?.data?.imageUrl || response?.data?.path;
+      if (!uploadedUrl) {
+        throw new Error('No se pudo obtener la URL de la imagen');
+      }
+      setProductForm(prev => ({
+        ...prev,
+        image: uploadedUrl
+      }));
+      toast.success('Imagen subida correctamente');
+    } catch (err) {
+      console.error('Error uploading image:', err);
+      toast.error(err.response?.data?.message || err.message || 'Error al subir la imagen');
+    } finally {
+      setUploadingImage(false);
+      if (input) input.value = '';
+    }
+  };
+
   const handleDeleteProduct = (id) => {
     setConfirmDialog({
       isOpen: true,
@@ -152,57 +192,20 @@ const Products = () => {
     });
   };
 
-  const toggleEditMode = (productId) => {
-    setEditMode(prev => ({
-      ...prev,
-      [productId]: !prev[productId]
-    }));
-  };
-
-  const confirmEdit = async (productId) => {
-    const product = products.find(p => p._id === productId);
-    if (product) {
-      try {
-        const totalQuantity = product.sizes.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
-        const updatedProduct = {
-          ...product,
-          quantity: totalQuantity,
-          listPrice: calculateListPrice(product.cashPrice)
-        };
-
-        const response = await productService.update(productId, updatedProduct);
-        setProducts(products.map(p =>
-          p._id === productId ? response.data : p
-        ));
-        setEditMode(prev => ({
-          ...prev,
-          [productId]: false
-        }));
-        toast.success('Cambios guardados exitosamente');
-      } catch (err) {
-        console.error('Error confirming edit:', err);
-        toast.error('Error al actualizar el producto');
-      }
-    }
-  };
-
-  const updateProductField = (productId, field, value) => {
-    setProducts(products.map(p =>
-      p._id === productId
-        ? { ...p, [field]: value }
-        : p
-    ));
-  };
-
-  const updateProductSize = (productId, sizeIndex, quantity) => {
-    setProducts(products.map(p => {
-      if (p._id === productId) {
-        const newSizes = [...p.sizes];
-        newSizes[sizeIndex] = { ...newSizes[sizeIndex], quantity: Number(quantity || 0) };
-        return { ...p, sizes: newSizes };
-      }
-      return p;
-    }));
+  const handleEditProduct = (product) => {
+    setEditingProduct(product);
+    setProductForm({
+      name: product.name,
+      category: product.category,
+      detail: product.detail || '',
+      sizes: product.sizes && product.sizes.length
+        ? product.sizes.map(size => ({ ...size }))
+        : initialProductForm.sizes,
+      costPrice: product.costPrice,
+      cashPrice: product.cashPrice,
+      image: product.image || ''
+    });
+    setShowAddModal(true);
   };
 
   if (loading) {
@@ -301,8 +304,8 @@ const Products = () => {
             </select>
           </div>
           
-          <div className="overflow-x-auto -mx-4 md:mx-0">
-            <table className="w-full min-w-[800px]">
+          <div className="-mx-2 md:mx-0">
+            <table className="w-full table-auto">
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Imagen</th>
@@ -310,11 +313,7 @@ const Products = () => {
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Detalle</th>
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Talles</th>
-                  {user.role === 'admin' && showCostPrice && (
-                    <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">P. Costo</th>
-                  )}
-                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">P. Contado</th>
-                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">P. Lista</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precios</th>
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
@@ -322,162 +321,73 @@ const Products = () => {
                 {filteredProducts.map(product => (
                   <tr key={product._id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                      <img src={product.image} alt={product.name} className="w-12 h-12 md:w-16 md:h-16 object-cover rounded-lg" />
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        className="w-12 h-12 md:w-16 md:h-16 object-cover rounded-lg border border-gray-100"
+                        onError={(e) => { e.target.src = 'https://via.placeholder.com/100'; }}
+                      />
                     </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                      {editMode[product._id] ? (
-                        <input
-                          type="text"
-                          value={product.name}
-                          onChange={(e) => updateProductField(product._id, 'name', e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                        />
-                      ) : (
-                        <span className="text-sm font-medium text-gray-900">{product.name}</span>
-                      )}
+                    <td className="px-3 md:px-6 py-3 md:py-4">
+                      <p className="text-sm font-medium text-gray-900">{product.name}</p>
                     </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                      {editMode[product._id] ? (
-                        <select
-                          value={product.category}
-                          onChange={(e) => updateProductField(product._id, 'category', e.target.value)}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded"
-                        >
-                          {categories.map(cat => (
-                            <option key={cat._id} value={cat.name}>{cat.name}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="px-2 md:px-3 py-1 text-xs font-medium rounded-full bg-secondary text-primary">
-                          {product.category}
-                        </span>
-                      )}
+                    <td className="px-3 md:px-6 py-3 md:py-4">
+                      <span className="px-2 md:px-3 py-1 text-xs font-medium rounded-full bg-secondary text-primary inline-flex">
+                        {product.category}
+                      </span>
                     </td>
                     <td className="px-3 md:px-6 py-3 md:py-4 hidden lg:table-cell">
-                      {editMode[product._id] ? (
-                        <input
-                          type="text"
-                          value={product.detail}
-                          onChange={(e) => updateProductField(product._id, 'detail', e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                        />
-                      ) : (
-                        <span className="text-sm text-gray-600">{product.detail}</span>
-                      )}
+                      <span className="text-sm text-gray-600">{product.detail || '—'}</span>
                     </td>
                     <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                      {editMode[product._id] ? (
-                        <div className="space-y-1">
-                          {product.sizes.map((sizeObj, idx) => (
-                            <div key={idx} className="flex items-center gap-2">
-                              <span className="text-xs font-medium w-6">{sizeObj.size}:</span>
-                              <input
-                                type="number"
-                                min="0"
-                                value={sizeObj.quantity}
-                                onChange={(e) => updateProductSize(product._id, idx, e.target.value)}
-                                className="w-16 px-2 py-1 text-sm border border-gray-300 rounded"
-                              />
-                            </div>
-                          ))}
-                          <div className="text-xs font-semibold text-gray-700 mt-1">
-                            Total: {product.sizes.reduce((sum, s) => sum + Number(s.quantity || 0), 0)}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-1">
-                          {product.sizes && product.sizes.length > 0 ? (
-                            <>
-                              {product.sizes.map((sizeObj, idx) => (
-                                <div key={idx} className="text-xs text-gray-600">
-                                  <span className="font-medium">{sizeObj.size}:</span> {sizeObj.quantity}
-                                </div>
-                              ))}
-                              <div className="text-sm font-semibold text-gray-700 mt-1">
-                                Total: {product.quantity}
+                      <div className="space-y-1 text-xs text-gray-600">
+                        {product.sizes && product.sizes.length > 0 ? (
+                          <>
+                            {product.sizes.map((sizeObj, idx) => (
+                              <div key={idx}>
+                                <span className="font-medium">{sizeObj.size}:</span> {sizeObj.quantity}
                               </div>
-                            </>
-                          ) : (
-                            <span className="text-sm font-semibold text-gray-700">{product.quantity}</span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    {user.role === 'admin' && showCostPrice && (
-                      <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                        {editMode[product._id] ? (
-                          <input
-                            type="number"
-                            value={product.costPrice}
-                            onChange={(e) => updateProductField(product._id, 'costPrice', e.target.value)}
-                            className="w-20 md:w-24 px-2 py-1 text-sm border border-gray-300 rounded"
-                          />
+                            ))}
+                            <div className="text-sm font-semibold text-gray-700 mt-1">
+                              Total: {product.quantity}
+                            </div>
+                          </>
                         ) : (
-                          <span className="text-sm text-gray-700">${product.costPrice}</span>
+                          <span className="text-sm font-semibold text-gray-700">{product.quantity}</span>
                         )}
-                      </td>
-                    )}
-                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                      {editMode[product._id] ? (
-                        <input
-                          type="number"
-                          value={product.cashPrice}
-                          onChange={(e) => updateProductField(product._id, 'cashPrice', e.target.value)}
-                          className="w-20 md:w-24 px-2 py-1 text-sm border border-gray-300 rounded"
-                        />
-                      ) : (
-                        <span className="text-sm font-semibold text-primary">${product.cashPrice}</span>
-                      )}
+                      </div>
                     </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                      {editMode[product._id] ? (
-                        <input
-                          type="number"
-                          value={product.listPrice}
-                          onChange={(e) => updateProductField(product._id, 'listPrice', e.target.value)}
-                          className="w-20 md:w-24 px-2 py-1 text-sm border border-gray-300 rounded"
-                        />
-                      ) : (
-                        <span className="text-sm text-gray-700">${product.listPrice}</span>
-                      )}
+                    <td className="px-3 md:px-6 py-3 md:py-4">
+                      <div className="space-y-1 text-sm">
+                        {user.role === 'admin' && showCostPrice && (
+                          <div className="text-xs text-gray-600">
+                            <span className="font-semibold text-gray-800">Costo:</span> ${product.costPrice}
+                          </div>
+                        )}
+                        <div className="text-sm font-semibold text-primary">
+                          Contado: ${product.cashPrice}
+                        </div>
+                        <div className="text-sm text-gray-700">
+                          Lista: ${product.listPrice}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm">
                       <div className="flex gap-2">
-                        {editMode[product._id] ? (
-                          <>
-                            <button
-                              onClick={() => confirmEdit(product._id)}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                              title="Confirmar cambios"
-                            >
-                              <Check className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => toggleEditMode(product._id)}
-                              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="Cancelar"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => toggleEditMode(product._id)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Habilitar edición"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteProduct(product._id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Eliminar"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
+                        <button
+                          onClick={() => handleEditProduct(product)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Editar producto"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProduct(product._id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -599,14 +509,53 @@ const Products = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Imagen (URL)</label>
-                <input
-                  type="text"
-                  value={productForm.image || ''}
-                  onChange={(e) => setProductForm({...productForm, image: e.target.value})}
-                  placeholder="https://ejemplo.com/imagen.jpg"
-                  className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-primary"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-2">Imagen del producto</label>
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-primary/40 text-primary font-medium text-sm hover:bg-primary/5 transition-colors">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        className="hidden"
+                        onChange={handleProductImageUpload}
+                      />
+                      {uploadingImage ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Subiendo...
+                        </>
+                      ) : (
+                        <>
+                          <span>Subir archivo</span>
+                          <span className="text-xs text-gray-500">(PNG, JPG, máx 5MB)</span>
+                        </>
+                      )}
+                    </label>
+                    {productForm.image && (
+                      <span className="text-xs text-gray-500 truncate max-w-[200px]">
+                        {productForm.image}
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={productForm.image || ''}
+                    onChange={(e) => setProductForm({...productForm, image: e.target.value})}
+                    placeholder="https://ejemplo.com/imagen.jpg o /uploads/archivo.png"
+                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-primary text-sm"
+                  />
+                  {productForm.image && (
+                    <div className="pt-2">
+                      <p className="text-xs text-gray-500 mb-1">Vista previa:</p>
+                      <img
+                        src={productForm.image}
+                        alt="Vista previa del producto"
+                        className="w-28 h-28 rounded-xl object-cover border border-gray-200 bg-gray-50"
+                        onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/100'; }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
               
               <div className="flex gap-4 pt-4">

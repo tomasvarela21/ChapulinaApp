@@ -159,22 +159,79 @@ export const deleteProduct = async (req, res) => {
 // @access  Private
 export const getLowStockProducts = async (req, res) => {
   try {
-    const threshold = req.query.threshold || 5;
+    const parsedThreshold = parseInt(req.query.threshold, 10);
+    const threshold = Number.isNaN(parsedThreshold) ? 2 : parsedThreshold;
 
-    const products = await Product.find({
-      isActive: true,
-      quantity: { $lt: parseInt(threshold) }
-    }).sort({ quantity: 1 });
+    const products = await Product.find({ isActive: true }).lean();
+
+    const lowStockProducts = products
+      .map(product => {
+        const sizes = Array.isArray(product.sizes) ? product.sizes : [];
+        const lowStockSizes = sizes.filter(size => typeof size.quantity === 'number' && size.quantity <= threshold);
+        const hasSizes = sizes.length > 0;
+        const qualifiesBySizes = lowStockSizes.length > 0;
+        const qualifiesByTotal = !hasSizes && typeof product.quantity === 'number' && product.quantity <= threshold;
+
+        if (!qualifiesBySizes && !qualifiesByTotal) {
+          return null;
+        }
+
+        return {
+          ...product,
+          lowStockSizes,
+          lowStockThreshold: threshold
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        const aQty = a.lowStockSizes.length > 0
+          ? Math.min(...a.lowStockSizes.map(size => size.quantity))
+          : a.quantity;
+        const bQty = b.lowStockSizes.length > 0
+          ? Math.min(...b.lowStockSizes.map(size => size.quantity))
+          : b.quantity;
+        return aQty - bQty;
+      });
 
     res.json({
       success: true,
-      count: products.length,
-      data: products
+      count: lowStockProducts.length,
+      data: lowStockProducts
     });
   } catch (error) {
     res.status(400).json({
       success: false,
       message: error.message
+    });
+  }
+};
+
+// @desc    Subir imagen de producto
+// @route   POST /api/products/upload-image
+// @access  Private/Admin
+export const uploadProductImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se recibió ningún archivo'
+      });
+    }
+
+    const relativePath = `/uploads/${req.file.filename}`;
+    const absoluteUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
+
+    res.status(201).json({
+      success: true,
+      data: {
+        imageUrl: absoluteUrl,
+        path: relativePath
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Error al subir la imagen'
     });
   }
 };

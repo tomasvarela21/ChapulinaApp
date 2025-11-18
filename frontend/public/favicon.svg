@@ -1,10 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-  <rect width="64" height="64" rx="12" fill="#ffffff" stroke="#b91c1c" stroke-width="3"/>
-  <path d="M16 20h32l6 12H10z" fill="#fff5f5" stroke="#b91c1c" stroke-width="3" stroke-linejoin="round"/>
-  <path d="M12 32h40v20H12z" fill="#fff5f5" stroke="#b91c1c" stroke-width="3" stroke-linejoin="round"/>
-  <path d="M14 32v4a4 4 0 0 0 8 0v-4m0 0v4a4 4 0 0 0 8 0v-4m0 0v4a4 4 0 0 0 8 0v-4m0 0v4a4 4 0 0 0 8 0v-4" fill="none" stroke="#b91c1c" stroke-width="2.6" stroke-linecap="round"/>
-  <rect x="26" y="38" width="12" height="12" rx="2" fill="#ffffff" stroke="#b91c1c" stroke-width="2.6"/>
-  <line x1="32" y1="38" x2="32" y2="50" stroke="#b91c1c" stroke-width="2.6"/>
-  <rect x="18" y="38" width="6" height="8" rx="1" fill="#ffffff" stroke="#b91c1c" stroke-width="2.4"/>
-  <rect x="40" y="38" width="6" height="8" rx="1" fill="#ffffff" stroke="#b91c1c" stroke-width="2.4"/>
+  <rect width="64" height="64" rx="12" fill="#ffffff"/>
+  <path d="M12 28h40v22H12z" fill="none" stroke="#000000" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M16 18h32l4 10H12z" fill="none" stroke="#000000" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M14 28v4a3 3 0 0 0 6 0v-4m0 0v4a3 3 0 0 0 6 0v-4m0 0v4a3 3 0 0 0 6 0v-4m0 0v4a3 3 0 0 0 6 0v-4m0 0v4a3 3 0 0 0 6 0v-4" fill="none" stroke="#000000" stroke-width="3" stroke-linecap="round"/>
+  <rect x="26" y="36" width="12" height="14" fill="none" stroke="#000000" stroke-width="3" stroke-linejoin="round"/>
+  <line x1="32" y1="36" x2="32" y2="50" stroke="#000000" stroke-width="3"/>
+  <rect x="16" y="36" width="6" height="10" fill="none" stroke="#000000" stroke-width="3" stroke-linejoin="round"/>
+  <rect x="42" y="36" width="6" height="10" fill="none" stroke="#000000" stroke-width="3" stroke-linejoin="round"/>
 </svg>

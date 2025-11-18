@@ -48,6 +48,16 @@ const productService = {
   updateAllListPrices: async (priceMarkup) => {
     const response = await api.put('/products/update-list-prices', { priceMarkup });
     return response.data;
+  },
+
+  // Upload product image
+  uploadImage: async (formData) => {
+    const response = await api.post('/products/upload-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
   }
 };
 

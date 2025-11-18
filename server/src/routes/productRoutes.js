@@ -6,9 +6,11 @@ import {
   updateProduct,
   deleteProduct,
   getLowStockProducts,
-  updateAllListPrices
+  updateAllListPrices,
+  uploadProductImage
 } from '../controllers/productController.js';
 import { protect, authorize } from '../middleware/auth.js';
+import upload from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -17,6 +19,22 @@ router.use(protect);
 
 router.get('/low-stock', getLowStockProducts);
 router.put('/update-list-prices', authorize('admin'), updateAllListPrices);
+router.post(
+  '/upload-image',
+  authorize('admin'),
+  (req, res, next) => {
+    upload.single('image')(req, res, function(err) {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message || 'Error al subir la imagen'
+        });
+      }
+      next();
+    });
+  },
+  uploadProductImage
+);
 
 router.route('/')
   .get(getProducts)

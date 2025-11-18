@@ -23,6 +23,10 @@ const Catalog = () => {
     paymentMethod: 'efectivo',
     notes: ''
   });
+  const [reservationErrors, setReservationErrors] = useState({
+    customer: false,
+    phone: false
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -79,6 +83,7 @@ const Catalog = () => {
       paymentMethod: status === 'vendida' ? 'efectivo' : 'none',
       notes: ''
     });
+    setReservationErrors({ customer: false, phone: false });
     setShowSaleModal(true);
   };
 
@@ -90,6 +95,11 @@ const Catalog = () => {
     return price * saleForm.quantity;
   };
 
+  const handleCloseSaleModal = () => {
+    setShowSaleModal(false);
+    setReservationErrors({ customer: false, phone: false });
+  };
+
   const handleSubmitSale = async () => {
     if (!saleForm.size) {
       toast.error('Por favor selecciona un talle');
@@ -98,12 +108,14 @@ const Catalog = () => {
 
     // Validar campos obligatorios para reservas
     if (saleForm.status === 'reservada') {
-      if (!saleForm.customer.trim()) {
-        toast.error('El nombre del cliente es obligatorio para reservas');
-        return;
-      }
-      if (!saleForm.phone.trim()) {
-        toast.error('El teléfono es obligatorio para reservas');
+      const missingCustomer = !saleForm.customer.trim();
+      const missingPhone = !saleForm.phone.trim();
+      setReservationErrors({
+        customer: missingCustomer,
+        phone: missingPhone
+      });
+      if (missingCustomer || missingPhone) {
+        toast.error('Nombre y teléfono son obligatorios para reservas');
         return;
       }
     }
@@ -139,6 +151,7 @@ const Catalog = () => {
         paymentMethod: 'efectivo',
         notes: ''
       });
+      setReservationErrors({ customer: false, phone: false });
       setSelectedProduct(null);
 
       toast.success(
@@ -231,21 +244,31 @@ const Catalog = () => {
 
       {/* Modal de Venta/Reserva */}
       {showSaleModal && selectedProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-4 md:p-6 max-w-lg w-full my-4 max-h-[95vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              handleCloseSaleModal();
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl p-4 md:p-6 max-w-lg w-full my-4 max-h-[90vh] flex flex-col shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg md:text-xl font-bold text-gray-800" style={{ fontFamily: 'Playfair Display, serif' }}>
                 {saleForm.status === 'vendida' ? 'Registrar Venta' : 'Registrar Reserva'}
               </h3>
               <button
-                onClick={() => setShowSaleModal(false)}
+                onClick={handleCloseSaleModal}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 flex-1 overflow-y-auto pr-1">
               {/* Información del producto */}
               <div className="bg-secondary p-3 rounded-lg border border-primary/20">
                 <p className="text-sm font-semibold text-primary">{selectedProduct.name}</p>
@@ -259,9 +282,24 @@ const Catalog = () => {
                   <input
                     type="text"
                     value={saleForm.customer}
-                    onChange={(e) => setSaleForm({...saleForm, customer: e.target.value})}
-                    placeholder="Nombre (opcional)"
-                    className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSaleForm({ ...saleForm, customer: value });
+                      if (reservationErrors.customer) {
+                        setReservationErrors(prev => ({ ...prev, customer: !value.trim() }));
+                      }
+                    }}
+                    placeholder={saleForm.status === 'reservada' ? 'Nombre (obligatorio)' : 'Nombre (opcional)'}
+                    className={`w-full px-3 py-1.5 text-sm rounded-lg focus:outline-none ${
+                      reservationErrors.customer && saleForm.status === 'reservada'
+                        ? 'border border-red-400 focus:border-red-500 bg-red-50'
+                        : 'border border-gray-200 focus:border-primary'
+                    }`}
+                    onBlur={() => {
+                      if (saleForm.status === 'reservada') {
+                        setReservationErrors(prev => ({ ...prev, customer: !saleForm.customer.trim() }));
+                      }
+                    }}
                   />
                 </div>
                 <div>
@@ -269,9 +307,24 @@ const Catalog = () => {
                   <input
                     type="tel"
                     value={saleForm.phone}
-                    onChange={(e) => setSaleForm({...saleForm, phone: e.target.value})}
-                    placeholder="Teléfono (opcional)"
-                    className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSaleForm({ ...saleForm, phone: value });
+                      if (reservationErrors.phone) {
+                        setReservationErrors(prev => ({ ...prev, phone: !value.trim() }));
+                      }
+                    }}
+                    placeholder={saleForm.status === 'reservada' ? 'Teléfono (obligatorio)' : 'Teléfono (opcional)'}
+                    className={`w-full px-3 py-1.5 text-sm rounded-lg focus:outline-none ${
+                      reservationErrors.phone && saleForm.status === 'reservada'
+                        ? 'border border-red-400 focus:border-red-500 bg-red-50'
+                        : 'border border-gray-200 focus:border-primary'
+                    }`}
+                    onBlur={() => {
+                      if (saleForm.status === 'reservada') {
+                        setReservationErrors(prev => ({ ...prev, phone: !saleForm.phone.trim() }));
+                      }
+                    }}
                   />
                 </div>
               </div>
@@ -365,7 +418,10 @@ const Catalog = () => {
                       name="status"
                       value="vendida"
                       checked={saleForm.status === 'vendida'}
-                      onChange={(e) => setSaleForm({...saleForm, status: e.target.value, paymentMethod: 'efectivo'})}
+                      onChange={(e) => {
+                        setSaleForm({...saleForm, status: e.target.value, paymentMethod: 'efectivo'});
+                        setReservationErrors({ customer: false, phone: false });
+                      }}
                     />
                     <span className="text-xs font-medium">Vendida</span>
                   </label>
@@ -376,7 +432,10 @@ const Catalog = () => {
                       name="status"
                       value="reservada"
                       checked={saleForm.status === 'reservada'}
-                      onChange={(e) => setSaleForm({...saleForm, status: e.target.value, paymentMethod: 'none'})}
+                      onChange={(e) => {
+                        setSaleForm({...saleForm, status: e.target.value, paymentMethod: 'none'});
+                        setReservationErrors({ customer: false, phone: false });
+                      }}
                     />
                     <span className="text-xs font-medium">Reservada</span>
                   </label>
@@ -443,7 +502,7 @@ const Catalog = () => {
                   {saleForm.status === 'vendida' ? 'Confirmar Venta' : 'Confirmar Reserva'}
                 </button>
                 <button
-                  onClick={() => setShowSaleModal(false)}
+                  onClick={handleCloseSaleModal}
                   className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm"
                 >
                   Cancelar
