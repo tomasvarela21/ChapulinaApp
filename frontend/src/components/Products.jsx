@@ -322,7 +322,7 @@ const Products = () => {
                   <tr key={product._id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                       <img
-                        src={product.image}
+                        src={product.image || 'https://via.placeholder.com/100'}
                         alt={product.name}
                         className="w-12 h-12 md:w-16 md:h-16 object-cover rounded-lg border border-gray-100"
                         onError={(e) => { e.target.src = 'https://via.placeholder.com/100'; }}

@@ -1,4 +1,5 @@
 import Product from '../models/Product.js';
+import cloudinary from '../config/cloudinary.js';
 
 // @desc    Obtener todos los productos
 // @route   GET /api/products
@@ -210,22 +211,39 @@ export const getLowStockProducts = async (req, res) => {
 // @route   POST /api/products/upload-image
 // @access  Private/Admin
 export const uploadProductImage = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No se recibió ningún archivo'
-      });
-    }
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      message: 'No se recibió ningún archivo'
+    });
+  }
 
-    const relativePath = `/uploads/${req.file.filename}`;
-    const absoluteUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
+  try {
+    const uploadPromise = new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'chapulina/products',
+          resource_type: 'image'
+        },
+        (error, result) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        }
+      );
+
+      uploadStream.end(req.file.buffer);
+    });
+
+    const result = await uploadPromise;
 
     res.status(201).json({
       success: true,
       data: {
-        imageUrl: absoluteUrl,
-        path: relativePath
+        imageUrl: result.secure_url,
+        publicId: result.public_id
       }
     });
   } catch (error) {
